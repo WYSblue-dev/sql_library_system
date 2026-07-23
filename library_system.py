@@ -46,8 +46,8 @@ class Author(Base):
     # primary key of the table authors one to many. 1 author to many books?
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    # made optional
-    bio: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # made optional and that lets us have a None value in the db
+    bio: Mapped[Optional[str]] = mapped_column(String)
 
     # one to many realationship established to the books(list) table Book with the
     # realationship function. back_populates points to the author.
@@ -80,7 +80,7 @@ class Book(Base):
     isbn: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     # by being optional do we mean in the sense of typing as Optional or
     # are we talking about not required? Also is this a datetime datetime moment?.......................
-    published_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    published_year: Mapped[Optional[int]] = mapped_column(Integer)
     author_id: Mapped[int] = mapped_column(
         # author_id on a book is a pointer to the id of the author of the book
         # so we create the relationship with the ForeignKey accessing the athour.id
@@ -88,13 +88,19 @@ class Book(Base):
         ForeignKey("author.id"),
         nullable=False,
     )
-    available: Mapped[bool] = mapped_column(Boolean)
+    # default is set so that we assume a book is in stock when we add a book
+    available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # many to one(author can have many books.)(many books can have one author)
     # so we'll need the relationship here
-    author: Mapped[str] = mapped_column(String)
+    author: Mapped[str] = relationship(back_populates="books")
     # many to many(many generes will apply to many books)
     # so we'll need the relationship here.(This also has the book_generes table)
-    genres: Mapped[str] = mapped_column(String)
+    genres: Mapped[str] = relationship(secondary="books_genres", back_populates="books")
+
+    # the checkout wasn't defined in the example setup but this is where it
+    # should take place?
+    # One Book many historical Checkout records
+    checkouts: Mapped[list["Checkout"]] = relationship(back_populates="book")
 
 
 # Implement the Borrower model
@@ -105,7 +111,10 @@ class Borrower(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    phone: Mapped[int] = mapped_column(Integer, nullable=True)
+    # phone numbers are strings but why again?
+    phone: Mapped[Optional[str]] = mapped_column(String)
+    # this is a borrower who checks out multiples(Checkouts) one to many
+    checkouts: Mapped[list["Checkout"]] = relationship(back_populates="borrower")
 
 
 # Implement the Checkout model
@@ -116,12 +125,23 @@ class Checkout(Base):
     __tablename__ = "checkouts"
     # define columns and relationships
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # this is the book_id that will apply to what book obj it is in the db
     book_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey, unique=True, nullable=False
+        Integer, ForeignKey("books.id"), nullable=False
     )
-    borrower_id: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    borrower_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("borrower.id"), nullable=False
+    )
+    # The date when the book was checked out.
     checkout_date: Mapped[date] = mapped_column(Date, nullable=False)
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # can be checked out then not returned so it can be left blank.
+    return_date: Mapped[Optional[date]] = mapped_column(Date)
+
+    # now we want to establish the many checkout records to the one book(history)
+    book: Mapped["Book"] = relationship(back_populates="checkouts")
+    # Many checkout records to one borrower
+    borrower: Mapped["Borrower"] = relationship(back_populates="checkouts")
 
 
 def init_db():
@@ -130,7 +150,6 @@ def init_db():
     Base.metadata.create_all(engine)
     # do we need pass here(can be a infinite loop if not? I wouldn't think
     # that to be the case as the create_all terminates surely)
-    pass
 
 
 # ============================================================
