@@ -29,11 +29,17 @@ class Base(DeclarativeBase):
 
 # Create the association/junction table for Book <-> Genre (many-to-many)
 # we have to specify the name of the table to reference in the tables
-# themselves
+# themselves. That is why metadata is so important. If gives this table
+# reference to all of our tables to work correctly.
 book_genres = Table(
     "book_genres",
     Base.metadata,
+    # Column of our book_genres table that points to a Book id for as many used
+    # a Book will get a genre and can have multiple. Multiple books can have
+    # the same genres.
     Column("book_id", Integer, ForeignKey("books.id"), primary_key=True),
+    # This is a Column of this association table to access the type of genre
+    # that is to be associated with the corresponding books.
     Column("genre_id", Integer, ForeignKey("genres.id"), primary_key=True),
 )
 
@@ -44,10 +50,10 @@ class Author(Base):
     __tablename__ = "authors"
     # define columns
     # primary key of the table authors one to many. 1 author to many books?
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     # made optional and that lets us have a None value in the db
-    bio: Mapped[Optional[str]] = mapped_column(String)
+    bio: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # one to many realationship established to the books(list) table Book with the
     # realationship function. back_populates points to the author.
@@ -58,12 +64,16 @@ class Author(Base):
 # Attributes: id (PK), name (required, unique)
 class Genre(Base):
     __tablename__ = "genres"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    # I need to take the time to think about generes. I think this would be a
-    # author who can have multiple generes(or just on the book itself. this is
-    # a design descision.)
+    # books is an genres attribute/field we are creating on this table.
+    # It can be a list of Book table objs.
+    # We set a relationship to access the book_genres(many to many) table.
+    # We can then access the values via a query like genre.books to see how
+    # many books a specific genre has or we can look at a book.genres to see
+    # how many genres it has.
     books: Mapped[list["Book"]] = relationship(
+        # points to the association table to be able to access a book.genres
         secondary=book_genres, back_populates="genres"
     )
 
@@ -92,7 +102,10 @@ class Book(Base):
     available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # many to one(author can have many books.)(many books can have one author)
     # so we'll need the relationship here
-    author: Mapped[str] = relationship(back_populates="books")
+    # When a book is used to access the author book.author is like a query.
+    # Points to the attribute of the Author model with the author_id attrbute
+    # we have set on the Book table. To access the authors rows and info.
+    author: Mapped["Author"] = relationship(back_populates="books")
     # many to many(many generes will apply to many books)
     # so we'll need the relationship here.(This also has the book_generes table)
     genres: Mapped[str] = relationship(secondary="books_genres", back_populates="books")
@@ -157,10 +170,12 @@ def init_db():
 # ============================================================
 
 
+# I think that I need to set up a session var that accesses the Session obj
 def add_author(name: str, bio: str = None):
     """Add a new author. Returns the created Author object."""
+    Session.add(Author(name, bio))
     # open Session, create Author, add + commit, return it
-    pass
+    Session.commit()
 
 
 def add_book(
@@ -175,13 +190,15 @@ def add_book(
     Returns the created Book object.
     """
     # implement
-    pass
+    Session.add(Book(title, isbn, author_id, published_year, genre_names))
+    Session.commit()
 
 
 def add_borrower(name: str, email: str, phone: str = None):
     """Register a new borrower. Returns the created Borrower object."""
     # implement
-    pass
+    Session.add(Borrower(name, email, phone))
+    Session.commit()
 
 
 def checkout_book(book_id: int, borrower_id: int, days: int = 14):
@@ -191,7 +208,15 @@ def checkout_book(book_id: int, borrower_id: int, days: int = 14):
     Returns the created Checkout object.
     """
     # implement
-    pass
+    # use the datetime.now to access the current day and date.
+    # I think I should be using a .get here change the valuse of the obj and
+    # then commiting the changes. The next thing to say here is that is seems
+    # there is redudent code that will be repetted and that is the connection
+    # to a specific database. That will be where we call .connection and assign
+    # that to the var session
+    session = Session.connection("sqlite:///library.db")
+    session.
+    session.commit()
 
 
 def return_book(checkout_id: int):
@@ -200,7 +225,10 @@ def return_book(checkout_id: int):
     Returns the updated Checkout object.
     """
     # implement
-    pass
+    # Is this where we use scaler/scalers? I need to go back and reference.
+    Session.get(checkout_id)
+
+    
 
 
 # ============================================================
