@@ -15,6 +15,7 @@ from sqlalchemy import (
     Column,
     Date,
     select,
+    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session
 from typing import Optional
@@ -163,14 +164,20 @@ def add_book(
         # genre_names could be None, so use an empty list in that case.
         for genre_name in genre_names or []:
             # Look for an existing Genre with this name.
+            # Have to use the scalar to query for existing.(Not a simple .get())
             genre = session.scalar(select(Genre).where(Genre.name == genre_name))
             # Create the Genre if it does not already exist.
             if genre is None:
+                # Create the Genre obj in the genres table
                 genre = Genre(name=genre_name)
-            # Add the Genre object to the Book's relationship collection.
+            # Add the Genre object to the Book's relationship collection(list).
             book.genres.append(genre)
+        # Now that we know author exist and the genres have been added we add
+        # to the books table
         session.add(book)
+        # commit the changes to the database
         session.commit()
+        # return the book
         return book
 
 
@@ -192,13 +199,19 @@ def checkout_book(book_id: int, borrower_id: int, days: int = 14):
     with Session(engine) as session:
         book = session.get(Book, book_id)
         if book.available:
+            # capture current date and add days to it.
             due_date = date.today() + days
+            # set available to False on the book row being accessed
             book.available = False
+            # add the Checkout
             session.add(
                 Checkout, book_id=book_id, borrower_id=borrower_id, due_date=due_date
             )
         else:
+            # if the book isn't available we can't let a checkout. Could use
+            # a try here with a print stmt for caliry in the CLI
             raise ValueError
+        # commit the changes to the db
         session.commit()
 
 
@@ -224,41 +237,83 @@ def find_books_by_author(author_name: str) -> list:
     """Return all books whose author name contains author_name (case-insensitive)."""
     # implement — use LIKE or ilike for partial matching
     with Session(engine) as session:
-        stmt = select()
-        things = session.scalars(stmt)
-        for loop in things:
-            print()
-        print()
+        stmt = (
+            # select the Book table
+            select(Book)
+            # joins the Book to the author
+            .join(Book.author)
+            # search for where the Author table has the name field/att that
+            # matches the author name argument that is passed to the function.
+            # We use .ilike for the insensitive casing.
+            .where(
+                Author.name.ilike(f"%{author_name}%"),
+            )
+        )
+        # What are scalers again? It is like the execute query to obtain all
+        # matches. Hence the reason we call .all() becuase there can be
+        # multiple objects
+        books = session.scalars(stmt).all()
+        return books
 
 
 def get_overdue_books() -> list:
     """Return all Checkout objects where due_date < today and return_date is None."""
     # implement
     with Session(engine) as session:
-        stmt = select()
-        things = session.scalars(stmt)
-        for loop in things:
-            print()
-        print()
+        # here we need the overdue books. What table could hold this
+        # information. Checkout holds the fields that we can use to find books
+        # that haven't been returned in time. We could also use the books with
+        # the days and expected day back maybe?
+        stmt = select(Checkout).where(
+            # we can simply check against todays date
+            Checkout.due_date < date.today(),
+            # This is another condition implemented for the purpose of checking
+            # if the attribute return_date is None. Would be used in the
+            # instance where one need to be set?
+            Checkout.return_date.is_(None),
+        )
+        # using scalers here is that execution through a table or tables to
+        # retrieve all of the relative objs or rows hence .all()
+        overdue_books = session.scalars(stmt).all()
+        return overdue_books
 
 
 def get_popular_genres(limit: int = 3) -> list:
     """Return the top `limit` genres by checkout count."""
     # implement — needs a join through Book to Checkout
+    # Assign the Session Class we use for working with the engine as session
     with Session(engine) as session:
-        stmt = select()
-        things = session.scalars(stmt)
-        for loop in things:
-            print()
-        print()
+        # ins't there a sqlalchemy count we can use instead?
+        # this is used to obtain a count for books that have matching genres
+        # applied. Also used for ordering purposes based on quantity.
+        checkout_count = func.count(Checkout.id)
+        # stmt to query.
+        stmt = (
+            select(Genre)
+            .join(Genre.books)
+            # why do we use 2x joins here? This is because we want to see a
+            # query result that is from the combined tables right? So we want
+            # to see the Genres that pattern match in correlation with the book
+            # by the checkouts though.
+            .join(Book.checkouts)
+            # we use the gourp_by since we have the 2x joins right. Working out
+            # of 2 tables vs. 1 where we could have just used a where.
+            # we group by the id and the name of the Genre so that we have the
+            # correct patterns.
+            .group_by(Genre.id, Genre.name)
+            # Order by
+            .order_by(checkout_count.desc())
+            .limit(limit=limit),
+        )
+        popular_genres = session.scalars(stmt).all()
+        return popular_genres
 
 
 def get_available_books() -> list:
     """Return all Book objects where available == True."""
     # implement
     with Session(engine) as session:
-        stmt = select()
-        things = session.scalars(stmt)
-        for loop in things:
-            print()
-        print()
+        stmt = select(Book).where(Book.available.is_(True))
+
+        books = session.scalars(stmt).all()
+        return books
