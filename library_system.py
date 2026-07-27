@@ -175,8 +175,10 @@ def init_db():
 def add_author(name: str, bio: str = None):
     """Add a new author. Returns the created Author object."""
     with Session(engine) as session:
-        session.add(Author(name=name, bio=bio))
+        author = Author(name=name, bio=bio)
+        session.add(author)
         session.commit()
+        return author
 
 
 def add_book(
@@ -215,20 +217,40 @@ def add_book(
             # Add the Genre object to the Book's relationship collection(list).
             book.genres.append(genre)
         # Now that we know author exist and the genres have been added we add
-        # to the books table
+        # to the books tabled
         session.add(book)
         # commit the changes to the database
         session.commit()
+        session.refresh(book)
         # return the book
         return book
 
 
-def add_borrower(name: str, email: str, phone: str = None):
-    """Register a new borrower. Returns the created Borrower object."""
-    # implement
+def add_borrower(
+    name: str,
+    email: str,
+    phone: str | None = None,
+) -> Borrower:
+    """Register a new borrower and return the created Borrower object."""
+
     with Session(engine) as session:
-        session.add(Borrower(name=name, email=email, phone=phone))
-        session.commit()
+        borrower = Borrower(
+            name=name,
+            email=email,
+            phone=phone,
+        )
+
+        session.add(borrower)
+
+        try:
+            session.commit()
+        except IntegrityError as error:
+            session.rollback()
+            raise ValueError("A borrower with that email may already exist.") from error
+
+        # refresh so that
+        session.refresh(borrower)
+        return borrower
 
 
 def checkout_book(book_id: int, borrower_id: int, days: int = 14):
@@ -237,24 +259,52 @@ def checkout_book(book_id: int, borrower_id: int, days: int = 14):
     Raises ValueError if the book is not available.
     Returns the created Checkout object.
     """
-    # implement
+    if days <= 0:
+        raise ValueError("Checkout days must be greater than 0")
     with Session(engine) as session:
         book = session.get(Book, book_id)
-        if book.available:
-            # capture current date and add days to it.
-            due_date = date.today() + days
-            # set available to False on the book row being accessed
-            book.available = False
-            # add the Checkout
-            session.add(
-                Checkout, book_id=book_id, borrower_id=borrower_id, due_date=due_date
-            )
-        else:
-            # if the book isn't available we can't let a checkout. Could use
-            # a try here with a print stmt for caliry in the CLI
-            raise ValueError
-        # commit the changes to the db
-        session.commit()
+
+        # see if book exist.
+        if book is None:
+            raise ValueError(f"Book ID {book_id} does not exist.")
+
+        # see if book available
+        if not book.available:
+            raise ValueError(f'"{book.title}" is not currently available.')
+
+        # see if borrower exist
+        borrower = session.get(Borrower, borrower_id)
+
+        # statement as to not borrower exisiting
+        if borrower is None:
+            raise ValueError(f"Borrower ID {borrower_id} does not exist.")
+
+        # combine the days date with the timedelta
+        due_date = date.today() + timedelta(days=days)
+
+        # create the Checkout databasse obj/row with the information that is now
+        # valid
+        new_checkout = Checkout(
+            book_id=book.id,
+            borrower_id=borrower.id,
+            due_date=due_date,
+        )
+        # set the book obj that we know exist to avaiable to false
+        book.available = False
+        # now add the checkout to that database
+        session.add(new_checkout)
+        # save with rollback protection
+        try:
+            session.commit()
+        except IntegrityError as error:
+            session.rollback()
+            raise ValueError(
+                "The checkout could not be saved because it "
+                "violated a database constraint."
+            ) from error
+        # refresh so the obj is up to date in the session
+        session.refresh(new_checkout)
+        return new_checkout
 
 
 def return_book(checkout_id: int):
@@ -264,10 +314,21 @@ def return_book(checkout_id: int):
     """
     # implement
     with Session(engine) as session:
-        checkout = session.get(Checkout, checkout_id)
+        while True:
+            try:
+                checkout = session.get(Checkout, checkout_id)
+                break
+            except ValueError:
+                print("The value entered must be a int not a string.")
+            except IntegrityError:
+                print("The int entered doesn't exist.")
+
         checkout.return_date = date.today()
+        # modify the book available attribute/field
         checkout.book.available = True
         session.commit()
+        session.refresh(checkout)
+        return checkout
 
 
 # ============================================================
@@ -282,20 +343,29 @@ def find_books_by_author(author_name: str) -> list:
         stmt = (
             # select the Book table
             select(Book)
-            # joins the Book to the author
+            # joins the Book to the authors table privided the relationship
+            # is set up correctly.
             .join(Book.author)
             # search for where the Author table has the name field/att that
             # matches the author name argument that is passed to the function.
             # We use .ilike for the insensitive casing.
             .where(
+                # percentage gives partial pattern matching.
                 Author.name.ilike(f"%{author_name}%"),
             )
         )
-        # What are scalers again? It is like the execute query to obtain all
-        # matches. Hence the reason we call .all() becuase there can be
-        # multiple objects
+        # Scalars are what we grab from the ORM Book, Genre etc...
+        # Hence the reason we call .all() becuase we want to collect them in
+        # the list
         books = session.scalars(stmt).all()
+        # return the list of the books
         return books
+
+
+def get_author_by_name(name: str) -> Author | None:
+    with Session(engine) as session:
+        stmt = func.lower(Author.name) == name.strip().lower()
+        return session.scalar(stmt)
 
 
 def get_overdue_books() -> list:
@@ -305,19 +375,21 @@ def get_overdue_books() -> list:
         # here we need the overdue books. What table could hold this
         # information. Checkout holds the fields that we can use to find books
         # that haven't been returned in time. We could also use the books with
-        # the days and expected day back maybe?
+        # the days and expected day back maybe? No just check back in the
+        # due_date vs. the dates day.
         stmt = select(Checkout).where(
             # we can simply check against todays date
             Checkout.due_date < date.today(),
             # This is another condition implemented for the purpose of checking
             # if the attribute return_date is None. Would be used in the
-            # instance where one need to be set?
+            # instance where the return_date hasn't been established.(still
+            # not returned/still active)
             Checkout.return_date.is_(None),
         )
         # using scalers here is that execution through a table or tables to
-        # retrieve all of the relative objs or rows hence .all()
-        overdue_books = session.scalars(stmt).all()
-        return overdue_books
+        # retrieve all of the relative objs or rows hence .all() to get list
+        overdue_checkouts = session.scalars(stmt).all()
+        return overdue_checkouts
 
 
 def get_popular_genres(limit: int = 3) -> list:
@@ -325,9 +397,8 @@ def get_popular_genres(limit: int = 3) -> list:
     # implement — needs a join through Book to Checkout
     # Assign the Session Class we use for working with the engine as session
     with Session(engine) as session:
-        # ins't there a sqlalchemy count we can use instead?
-        # this is used to obtain a count for books that have matching genres
-        # applied. Also used for ordering purposes based on quantity.
+        # this func we needed to import in the top of the file from sqlalchemy.
+        # This is the equivlent to sqlalchemy.
         checkout_count = func.count(Checkout.id)
         # stmt to query.
         stmt = (
@@ -338,14 +409,12 @@ def get_popular_genres(limit: int = 3) -> list:
             # to see the Genres that pattern match in correlation with the book
             # by the checkouts though.
             .join(Book.checkouts)
-            # we use the gourp_by since we have the 2x joins right. Working out
-            # of 2 tables vs. 1 where we could have just used a where.
-            # we group by the id and the name of the Genre so that we have the
-            # correct patterns.
+            # group because COUNT() must calculate a separate checkout count
+            # for each genre.
             .group_by(Genre.id, Genre.name)
             # Order by
             .order_by(checkout_count.desc())
-            .limit(limit=limit),
+            .limit(limit)
         )
         popular_genres = session.scalars(stmt).all()
         return popular_genres
@@ -355,7 +424,8 @@ def get_available_books() -> list:
     """Return all Book objects where available == True."""
     # implement
     with Session(engine) as session:
+        # retrieve Book table books where the books att/field available
+        # is True.
         stmt = select(Book).where(Book.available.is_(True))
-
         books = session.scalars(stmt).all()
         return books
