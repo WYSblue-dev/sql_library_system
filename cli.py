@@ -109,62 +109,89 @@ def menu_add_borrower():
 def menu_checkout():
     """Prompt for book ID and borrower ID, then check out the book."""
     # TODO: Show available books (call get_available_books())
-    # need the book id and the borrower id to be able to check out a book.
-    # so we'll get those via a loop and the call the chekcout_book function,
-    # and handle the checkout_book()
-    # show books
-    while True:
-        try:
-            borrower_id = int(input("Please enter your borrower id: "))
-            break
-        except ValueError:
-            print("Please enter a valid id number. Try again.")
-            continue
-
     books = get_available_books()
-    # need to handle if they're no books and need to handle the book id itself
-    # from the users selection. This is more of a ui decision.
+
     if not books:
         print("No books are currently available sorry.")
         return
+
     # displays books since they exist
-    for place, book in enumerate(books, start=1):
-        print(f"{place}. Book title - {book.title} ID - {book.id}")
+    print("\nAvailable books:")
+
+    # this is the better bet to handle the selected book later that is available
+    # without this the user could then enter a valid book id that wasn't shown
+    # but can't be checked out. Using available books with a dictionary lets
+    # us handle the keys with the .get function that python provides
+    available_books = {book.id: book for book in books}
+
+    for book in books:
+        print(f"Book ID: {book.id} | Title: {book.title}")
 
     # True loop for input handling
     while True:
         try:
-            prompt = int(input("What book would you like to check out(ID)?"))
+            borrower_id = int(input("\nPlease enter your borrower ID: ").strip())
+
+            book_id = int(input("Please enter the book ID: ").strip())
         # needs to be a integer handling
         except ValueError:
-            print("Please enter a valid number. Try again.")
+            print("Please enter a valid whole numbers. Try again.")
             # restart loop
             continue
-        # we didn't handle the checkout_book days. That's optional. Who should
-        # be checking that work?
-        for book in books:
-            if prompt == book.id:
-                print(f"It looks like you selected {book.title}")
-                # since this returns a checkout date we could add a timestamp for
-                # the due_date to the user.
-                taken_book = checkout_book(book_id=prompt, borrower_id=borrower_id)
-                # The pretty print out.
-                print(f"{book.title} has been successfully checked out.")
-                # how do we get and set the book to unavailable? did we handle this
-                # in our class? yes we did so that is taken care of.
-                return taken_book
-        print("Please enter a valid ID. Try again")
-        continue
+
+        # interation utilizing next function until the condiiton of the
+        # if conditional is satisfied.
+        # original approach
+        # selected_book = next(book for book in books if book.id == book_id)
+
+        # uses the .get to handle key errors
+        selected_book = available_books.get(book_id)
+        # now we check if the books actually is available
+        if selected_book is None:
+            print("That ID does not belong to one of the available books.")
+            # reset the loop
+            continue
+
+        # handle the checkout creation now that we know the input is validated
+        try:
+            checkout = checkout_book(
+                book_id=book_id,
+                borrower_id=borrower_id,
+            )
+
+        # Handle error in worst case senario
+        except ValueError as error:
+            print(f"Checkout failed: {error}")
+            continue
+
+        # Nice print out statement
+        print(f'"{selected_book.title}" was successfully checked out.')
+        # express due date
+        print(f"Due date: {checkout.due_date}")
+
+        return checkout
 
 
 def menu_return():
     """Prompt for checkout ID and return the book."""
     # TODO: Prompt for checkout_id, call return_book(), print confirmation
+    # our return_book handles the value error already. Maybe handle if None
+    # bassed on the int entered by checking against the checkouts table.
     while True:
+        # could do a account look up here of sorts.
         prompt = "I need your checkout ID to return the book you have checked out."
-        user_checkout_id = int(input(prompt, "\nID: "))
-        returned_book = return_book(checkout_id=user_checkout_id)
-        return returned_book
+        try:
+            user_checkout_id = int(input(f"{prompt} \nID: ").strip())
+            returned_checkout = return_book(
+                checkout_id=user_checkout_id,
+            )
+        except ValueError as error:
+            # will show message with corresponding error
+            print(f"Return failed: {error}")
+            continue
+
+        print(f"Checkout ID {returned_checkout.id} was successfully returned!")
+        return returned_checkout
 
 
 def menu_search_by_author():
