@@ -51,9 +51,12 @@ class Base(DeclarativeBase):
 
 
 # Create the association/junction table for Book <-> Genre (many-to-many)
+# many books have many genres.
 book_genres = Table(
     "book_genres",
+    # metadata for connecting and context
     Base.metadata,
+    # set up Keys for reference
     Column("book_id", Integer, ForeignKey("books.id"), primary_key=True),
     Column("genre_id", Integer, ForeignKey("genres.id"), primary_key=True),
 )
@@ -68,6 +71,9 @@ class Author(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     # made optional and that lets us have a None value in the db
     bio: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # connects to the books table via relationship. Book.author
+    # gives us the list of books by one author when handling the author obj
+    # author.books think loop through books to get matchs.
     books: Mapped[list["Book"]] = relationship(back_populates="author")
 
 
@@ -77,8 +83,14 @@ class Genre(Base):
     __tablename__ = "genres"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    # looks at a list of books based on the relationship. Refrences the
+    # junc.table (multiple rows with same book but different genre number)
+    # genres.books looks at Book(books).genres attribute setup on that table to
+    # get values
     books: Mapped[list["Book"]] = relationship(
+        # pointer to association/junc table
         secondary=book_genres,
+        # for the caller when working with other end of relationship.
         back_populates="genres",
     )
 
@@ -93,6 +105,8 @@ class Book(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     isbn: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     published_year: Mapped[Optional[int]] = mapped_column(Integer)
+    # the ForeignKey that is pointing at the authors.id integer/primary_key
+    # note this is different from the relationship.
     author_id: Mapped[int] = mapped_column(
         Integer,
         # does this need to be authors?
@@ -100,7 +114,14 @@ class Book(Base):
         nullable=False,
     )
     available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # this is the many to one relationship put into action. This accesses the
+    # author via the the author_id that is present in the row which must exist.
+    # we can access an authors books via book.author.books because of the books
+    # that is setup on the author class which points here and queries the db
+    # to get all books that match the author_id.
     author: Mapped["Author"] = relationship(back_populates="books")
+    # genres points back to the association/junction talbe pointing at the
+    # Colum we defined
     genres: Mapped[list["Genre"]] = relationship(
         secondary="book_genres", back_populates="books"
     )
