@@ -62,6 +62,45 @@ book_genres = Table(
 )
 
 
+# Authors and books associantion table.
+# the purpose of this table is to be able to set many books with many authors
+book_authors = Table(
+    "book_authors",
+    Base.metadata,
+    # removed the Foreign key on book to author becasue they reside here
+    # with pointers back to here.
+    Column("book_id", Integer, ForeignKey("books.id"), primary_key=True),
+    Column("author_id", Integer, ForeignKey("authors.id"), primary_key=True),
+)
+
+# books ↔ members (borrowings): Track which member borrowed which book, with
+# checkout_date and return_date (NULL if not returned yet). This can be
+# implemented as an association table with extra columns, or as its own model
+# with foreign keys to both books and members.
+
+# it would seem like to me that I need to migrate the functionality of the
+# borrowers in a sense to the membership instance. Also track the book borrowed
+# by the member with the either A Borrower table or B a own model with
+# foreignkeys
+
+# what that sounds like to be a member can have many books checked out. So I
+# need to be able to take the time to add in that specifically.
+
+# checkout_date, and return_date are the most important.
+
+
+class Members(Base):
+    __tablename__ = "members"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[Optional[str]] = mapped_column(String, unique=True)
+    membership_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+        default=date.today(),
+    )
+
+
 # Implement the Author model
 # Attributes: id (PK), name (required), bio (optional)
 class Author(Base):
