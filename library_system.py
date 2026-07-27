@@ -180,6 +180,7 @@ class Borrower(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     phone: Mapped[Optional[str]] = mapped_column(String)
+    # borrower can have many checkouts
     checkouts: Mapped[list["Checkout"]] = relationship(back_populates="borrower")
 
 
@@ -187,6 +188,10 @@ class Borrower(Base):
 # Attributes: id (PK), book_id (FK), borrower_id (FK),
 #             checkout_date (date), due_date (date), return_date (date, nullable)
 # Relationships: book, borrower
+
+# checkout would be an id that is attatched to a book and sets the bool on the Book
+
+
 class Checkout(Base):
     __tablename__ = "checkouts"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -199,10 +204,17 @@ class Checkout(Base):
         ForeignKey("borrowers.id"),
         nullable=False,
     )
-    checkout_date: Mapped[date] = mapped_column(Date, nullable=False)
+    checkout_date: Mapped[date] = mapped_column(
+        Date,
+        default=date.today,
+        nullable=False,
+    )
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
     return_date: Mapped[Optional[date]] = mapped_column(Date)
     book: Mapped["Book"] = relationship(back_populates="checkouts")
+    # this is the list of chekcouts that will be updated for one borrower based
+    # on the books that they have checked out. Books that are checked are
+    # assumed to only have one. This is due to the potential of only one book.
     borrower: Mapped["Borrower"] = relationship(back_populates="checkouts")
 
 
