@@ -14,13 +14,34 @@ from sqlalchemy import (
     Table,
     Column,
     Date,
+    # needed import
     select,
+    # needed import
     func,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session
-from typing import Optional
-from datetime import date
 
+# The IntegrityError is important for handling the cases where and email is
+# entered twice and need to be unique. We will add that catch of this issue in
+# a try except block.
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    Session,
+)
+
+# Optional is for when we want a value to be tranlated between python and sql
+# as either None or NULL. Optional makes the field/attribute optional though.
+from typing import Optional
+
+# datetime for the purpose of time stamping.
+# also timedelta is for the purpose of handling and editng the timedelta
+from datetime import date, timedelta
+
+# connect to the database with echo set to false.
+# to see the raw sql set echo to True.
 engine = create_engine("sqlite:///library.db", echo=False)
 
 
