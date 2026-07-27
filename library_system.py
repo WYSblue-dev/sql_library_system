@@ -222,13 +222,14 @@ def add_author(name: str, bio: str = None):
         author = Author(name=name, bio=bio)
         session.add(author)
         session.commit()
+        session.refresh(author)
         return author
 
 
 def add_book(
     title: str,
     isbn: str,
-    author_id: int,
+    author_ids: list[int],
     published_year: int = None,
     genre_names: list = None,
 ):
@@ -236,27 +237,57 @@ def add_book(
     Add a new book. Assigns genres by name (creates genre if it doesn't exist yet).
     Returns the created Book object.
     """
-    # implement
+    title = title.strip()
+    isbn = isbn.strip()
+
+    if not title:
+        raise ValueError("A book title is required.")
+
+    if not isbn:
+        raise ValueError("An ISBN is required.")
+
+    if not author_ids:
+        raise ValueError("A book must have at least one author.")
+
+    # Remove duplicate author IDs while preserving their input order.
+    unique_author_ids = list(dict.fromkeys(author_ids))
+
     with Session(engine) as session:
-        # Confirm that the supplied author exists.
-        author = session.get(Author, author_id)
-        if author is None:
-            raise ValueError(f"No author found with ID {author_id}")
+        # Check for an existing book before attempting the insert.
+        existing_book = session.scalar(select(Book).where(Book.isbn == isbn))
+
+        if existing_book is not None:
+            raise ValueError(f"A book with ISBN {isbn} already exists.")
+
+        authors = []
+
+        for author_id in unique_author_ids:
+            author = session.get(Author, author_id)
+            if author is None:
+                raise ValueError(f"No author found with ID {author_id}.")
+            authors.append(author)
         # Create the Book object first.
         book = Book(
             title=title,
             isbn=isbn,
-            author_id=author_id,
             published_year=published_year,
         )
+
+        # Populate the Book.authors relationship collection.
+        # this is new because we have the many to many relationship now.
+        book.authors.extend(authors)
+
+        # remove duplicates
+        genre_names = set(genre_names)
+
         # genre_names could be None, so use an empty list in that case.
         for genre_name in genre_names or []:
-            # Look for an existing Genre with this name.
-            # Have to use the scalar to query for existing.(Not a simple .get())
-            genre = session.scalar(select(Genre).where(Genre.name == genre_name))
+            update_genre_name = genre_name.strip().lower()
+            # now looks with strip and lower
+            genre = session.scalar(select(Genre).where(Genre.name == update_genre_name))
             # Create the Genre if it does not already exist.
             if genre is None:
-                # Create the Genre obj in the genres table
+                # Create the Genre obj in the genres table if doesn't exist
                 genre = Genre(name=genre_name)
             # Add the Genre object to the Book's relationship collection(list).
             book.genres.append(genre)
@@ -264,7 +295,13 @@ def add_book(
         # to the books tabled
         session.add(book)
         # commit the changes to the database
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError as error:
+            session.rollback()
+            raise ValueError(
+                "The book could not be added due to a violation" "of constraints"
+            ) from error
         session.refresh(book)
         # return the book
         return book
@@ -385,6 +422,10 @@ def find_books_by_author(author_name: str) -> list:
     # implement — use LIKE or ilike for partial matching
     with Session(engine) as session:
         stmt = (
+            # might be able to do this differently now since there is a means
+            # to be able to looks at multiple authors on one book. So may find
+            # a book that has one author. Maybe we could perform pattern
+            # matching here.
             # select the Book table
             select(Book)
             # joins the Book to the authors table privided the relationship
