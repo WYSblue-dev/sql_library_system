@@ -337,6 +337,7 @@ def add_borrower(
 
         try:
             session.commit()
+        # handle if a unique value already exists
         except IntegrityError as error:
             session.rollback()
             raise ValueError("A borrower with that email may already exist.") from error
