@@ -389,8 +389,12 @@ def checkout_book(book_id: int, borrower_id: int, days: int = 14):
         # save with rollback protection
         try:
             session.commit()
+        # Notice that if we have set error here as a var to access
+        # IntegrityError
         except IntegrityError as error:
+            # rollback the session to its working state
             session.rollback()
+            # state why didn't work and we roll back
             raise ValueError(
                 "The checkout could not be saved because it "
                 "violated a database constraint."
@@ -407,19 +411,29 @@ def return_book(checkout_id: int):
     """
     # implement
     with Session(engine) as session:
-        while True:
-            try:
-                checkout = session.get(Checkout, checkout_id)
-                break
-            except ValueError:
-                print("The value entered must be a int not a string.")
-            except IntegrityError:
-                print("The int entered doesn't exist.")
+        checkout = session.get(Checkout, checkout_id)
 
+        if checkout is None:
+            raise ValueError(f"The ID entered {checkout_id} doesn't exist.")
+
+        # check the return_date isn't already a value
+        if checkout.return_date is not None:
+            raise ValueError(f"Checkout ID {checkout_id} has already been returned.")
+
+        book = session.get(Book, checkout.book_id)
+
+        # makes sure the book exist. This feels redudent but is an extra step
+        # of validaiton that would prevent crash.
+        if book is None:
+            raise ValueError(f"Book ID {checkout.book_id} does not exist.")
+
+        # set the date to today
         checkout.return_date = date.today()
-        # modify the book available attribute/field
-        checkout.book.available = True
+        # modify the book available attribute/field from the book in session
+        book.available = True
+
         session.commit()
+        # update the checkout object in the session so it's returned correctly.
         session.refresh(checkout)
         return checkout
 
