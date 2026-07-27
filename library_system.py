@@ -428,7 +428,7 @@ def find_books_by_author(author_name: str) -> list:
             select(Book)
             # joins the Book to the authors table privided the relationship
             # is set up correctly.
-            .join(Book.author)
+            .join(Book.authors)
             # search for where the Author table has the name field/att that
             # matches the author name argument that is passed to the function.
             # We use .ilike for the insensitive casing.
@@ -447,7 +447,7 @@ def find_books_by_author(author_name: str) -> list:
 
 def get_author_by_name(name: str) -> Author | None:
     with Session(engine) as session:
-        stmt = func.lower(Author.name) == name.strip().lower()
+        stmt = select(func.lower(Author.name) == name.strip().lower())
         return session.scalar(stmt)
 
 
