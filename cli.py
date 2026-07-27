@@ -10,7 +10,7 @@ from library_system import (
     init_db,
     add_author,
     add_book,
-    add_borrower,
+    add_member,
     checkout_book,
     return_book,
     find_books_by_author,
@@ -20,67 +20,69 @@ from library_system import (
     # added a helper to obtain the author based on existence
     get_author_by_name,
     # added for the clarity of acknoleding name
-    Borrower,
+    Member,
 )
 
 
 def menu_add_book():
     """Prompt for book details and add to the database."""
-    # capture values needed
     title = input("Title: ").strip()
     isbn = input("ISBN: ").strip()
-    author_name = input("Author name: ").strip()
 
-    # if not value entered for any reqs
-    if not title or not isbn or not author_name:
-        print("Title, ISBN, and author name are required.")
+    author_input = input("Author names (separated by commas): ").strip()
+
+    author_names = [name.strip() for name in author_input.split(",") if name.strip()]
+
+    if not title or not isbn or not author_names:
+        print("Title, ISBN, and at least one author are required.")
         return
 
-    # Keep asking until the user enters a valid year or leaves it blank.
     while True:
         year_input = input("Published year (optional): ").strip()
-        # blank input
         if not year_input:
             published_year = None
             break
-        # try numeric
+
         try:
             published_year = int(year_input)
             break
         except ValueError:
             print("Published year must be a whole number.")
-    # capture the genres(need to handle if not seperated with commas)
-    genre_input = input("Genres(separated by commas): ").strip()
-    # list comp for genre names using the commas to split
+
+    genre_input = input("Genres (separated by commas): ").strip()
     genre_names = [genre.strip() for genre in genre_input.split(",") if genre.strip()]
-    # Look for the author directly in the authors table by their name
-    # made not case sensitive
-    author = get_author_by_name(author_name)
 
-    # no author found then creates a new
-    if author is None:
-        print(f'Author "{author_name}" was not found.')
-        bio = input("Author bio (optional): ").strip() or None
-        # uses the name that was entered for the author.(maybe ask if want to
-        # add first before assuming....?)
-        author = add_author(
-            name=author_name,
-            bio=bio,
+    authors = []
+    for author_name in author_names:
+        author = get_author_by_name(author_name)
+        if author is None:
+            print(f'Author "{author_name}" was not found.')
+            bio = input(f'Bio for "{author_name}" (optional): ').strip() or None
+            author = add_author(
+                name=author_name,
+                bio=bio,
+            )
+        authors.append(author)
+    author_ids = [author.id for author in authors]
+    try:
+        new_book = add_book(
+            title=title,
+            isbn=isbn,
+            author_ids=author_ids,
+            published_year=published_year,
+            genre_names=genre_names,
         )
-    # add the book
-    new_book = add_book(
-        title=title,
-        isbn=isbn,
-        author_id=author.id,
-        published_year=published_year,
-        genre_names=genre_names,
-    )
-    # print a nice message
-    print(f'Book "{new_book.title}" by {author.name} ' "was added successfully!")
+    except ValueError as error:
+        print(f"Book could not be added: {error}")
+        return
+
+    author_display = ", ".join(author.name for author in authors)
+    print(f'Book "{new_book.title}" by {author_display} ' "was added successfully!")
+    return new_book
 
 
-def menu_add_borrower():
-    """Prompt for borrower details and register in the database."""
+def menu_add_member():
+    """Prompt for member details and register in the database."""
     while True:
         name = input("Name: ").strip()
         email = input("Email: ").strip()
@@ -91,7 +93,7 @@ def menu_add_borrower():
             print("Name and Email are required try again.")
             continue
         try:
-            borrower = add_borrower(
+            member = add_member(
                 name=name,
                 email=email,
                 phone=phone,
@@ -99,15 +101,12 @@ def menu_add_borrower():
         except ValueError as error:
             print(error)
             continue
-        print(
-            f"{borrower.name} was successfully added "
-            f"with borrower ID {borrower.id}."
-        )
+        print(f"{member.name} was successfully added " f"with member ID {member.id}.")
         break
 
 
 def menu_checkout():
-    """Prompt for book ID and borrower ID, then check out the book."""
+    """Prompt for book ID and member ID, then check out the book."""
     # TODO: Show available books (call get_available_books())
     books = get_available_books()
 
@@ -130,7 +129,7 @@ def menu_checkout():
     # True loop for input handling
     while True:
         try:
-            borrower_id = int(input("\nPlease enter your borrower ID: ").strip())
+            member_id = int(input("\nPlease enter your member ID: ").strip())
 
             book_id = int(input("Please enter the book ID: ").strip())
         # needs to be a integer handling
@@ -156,7 +155,7 @@ def menu_checkout():
         try:
             checkout = checkout_book(
                 book_id=book_id,
-                borrower_id=borrower_id,
+                member_id=member_id,
             )
 
         # Handle error in worst case senario
@@ -215,7 +214,7 @@ def main():
     while True:
         print("\n=== Library Management System ===")
         print("1. Add a book")
-        print("2. Register a borrower")
+        print("2. Register a member")
         print("3. Check out a book")
         print("4. Return a book")
         print("5. Search by author")
@@ -228,7 +227,7 @@ def main():
         if choice == "1":
             menu_add_book()
         elif choice == "2":
-            menu_add_borrower()
+            menu_add_member()
         elif choice == "3":
             menu_checkout()
         elif choice == "4":

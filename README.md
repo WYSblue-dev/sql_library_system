@@ -24,8 +24,8 @@
 
 A command-line library management system backed by SQLAlchemy. You'll implement:
 
-- **Models** (`library_system.py`): Book, Author, Borrower, Genre with proper relationships
-- **CRUD operations**: Add books/borrowers, check out and return books
+- **Models** (`library_system.py`): Book, Author, Member, Genre with proper relationships
+- **CRUD operations**: Add books/members, check out and return books
 - **Queries**: Search by author, find overdue books, most popular genres
 - **CLI** (`cli.py`): A menu-driven interface for all operations
 
@@ -34,13 +34,13 @@ A command-line library management system backed by SQLAlchemy. You'll implement:
 - **Author**: id, name, bio (optional)
 - **Genre**: id, name (unique)
 - **Book**: id, title, isbn (unique), published_year, author_id (FK), available (bool). Many-to-many with Genre.
-- **Borrower**: id, name, email (unique), phone (optional)
-- **Checkout**: id, book_id (FK), borrower_id (FK), checkout_date, due_date, return_date (NULL if not returned)
+- **Member**: id, name, email (unique), phone (optional)
+- **Checkout**: id, book_id (FK), member_id (FK), checkout_date, due_date, return_date (NULL if not returned)
 
 ## File Overview
 
-| File | Your Job |
-|------|----------|
+| File                | Your Job                                               |
+| ------------------- | ------------------------------------------------------ |
 | `library_system.py` | Implement SQLAlchemy models and all database functions |
-| `cli.py` | Implement the menu handler functions (loop provided) |
-| `seed_data.py` | Add seed data to test your system |
+| `cli.py`            | Implement the menu handler functions (loop provided)   |
+| `seed_data.py`      | Add seed data to test your system                      |

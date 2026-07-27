@@ -73,33 +73,6 @@ book_authors = Table(
     Column("author_id", Integer, ForeignKey("authors.id"), primary_key=True),
 )
 
-# books ↔ members (borrowings): Track which member borrowed which book, with
-# checkout_date and return_date (NULL if not returned yet). This can be
-# implemented as an association table with extra columns, or as its own model
-# with foreign keys to both books and members.
-
-# it would seem like to me that I need to migrate the functionality of the
-# borrowers in a sense to the membership instance. Also track the book borrowed
-# by the member with the either A Borrower table or B a own model with
-# foreignkeys
-
-# what that sounds like to be a member can have many books checked out. So I
-# need to be able to take the time to add in that specifically.
-
-# checkout_date, and return_date are the most important.
-
-
-class Members(Base):
-    __tablename__ = "members"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
-    name: Mapped[str] = mapped_column(String, nullable=False)
-    email: Mapped[Optional[str]] = mapped_column(String, unique=True)
-    membership_date: Mapped[date] = mapped_column(
-        Date,
-        nullable=False,
-        default=date.today(),
-    )
-
 
 # Implement the Author model
 # Attributes: id (PK), name (required), bio (optional)
@@ -151,7 +124,7 @@ class Book(Base):
     isbn: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     published_year: Mapped[Optional[int]] = mapped_column(Integer)
 
-    # Borrower can check out many books. One book one chekcout.
+    # Member can check out many books. One book one chekcout.
 
     available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # this is the many to one relationship put into action. This accesses the
@@ -172,22 +145,27 @@ class Book(Base):
     checkouts: Mapped[list["Checkout"]] = relationship(back_populates="book")
 
 
-# Implement the Borrower model
+# Implement the Member model
 # Attributes: id (PK), name (required), email (unique, required), phone (optional)
-class Borrower(Base):
-    __tablename__ = "borrowers"
+class Member(Base):
+    __tablename__ = "members"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     phone: Mapped[Optional[str]] = mapped_column(String)
-    # borrower can have many checkouts
-    checkouts: Mapped[list["Checkout"]] = relationship(back_populates="borrower")
+    # member can have many checkouts
+    checkouts: Mapped[list["Checkout"]] = relationship(back_populates="member")
+    membership_date: Mapped[date] = mapped_column(
+        Date,
+        default=date.today,
+        nullable=False,
+    )
 
 
 # Implement the Checkout model
-# Attributes: id (PK), book_id (FK), borrower_id (FK),
+# Attributes: id (PK), book_id (FK), member_id (FK),
 #             checkout_date (date), due_date (date), return_date (date, nullable)
-# Relationships: book, borrower
+# Relationships: book, member
 
 # checkout would be an id that is attatched to a book and sets the bool on the Book
 
@@ -198,10 +176,10 @@ class Checkout(Base):
     book_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("books.id"), nullable=False
     )
-    borrower_id: Mapped[int] = mapped_column(
+    member_id: Mapped[int] = mapped_column(
         Integer,
-        # does this need to be borrowers?
-        ForeignKey("borrowers.id"),
+        # does this need to be members?
+        ForeignKey("members.id"),
         nullable=False,
     )
     checkout_date: Mapped[date] = mapped_column(
@@ -212,10 +190,10 @@ class Checkout(Base):
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
     return_date: Mapped[Optional[date]] = mapped_column(Date)
     book: Mapped["Book"] = relationship(back_populates="checkouts")
-    # this is the list of chekcouts that will be updated for one borrower based
+    # this is the list of chekcouts that will be updated for one member based
     # on the books that they have checked out. Books that are checked are
     # assumed to only have one. This is due to the potential of only one book.
-    borrower: Mapped["Borrower"] = relationship(back_populates="checkouts")
+    member: Mapped["Member"] = relationship(back_populates="checkouts")
 
 
 def init_db():
@@ -261,13 +239,17 @@ def add_book(
     if not author_ids:
         raise ValueError("A book must have at least one author.")
 
-    # Remove duplicate author IDs while preserving their input order.
+    # Remove duplicate IDs while preserving their order.
     unique_author_ids = list(dict.fromkeys(author_ids))
+    # Normalize first, then remove duplicates.
+    cleaned_genre_names = {
+        genre_name.strip().lower()
+        for genre_name in (genre_names or [])
+        if genre_name.strip()
+    }
 
     with Session(engine) as session:
-        # Check for an existing book before attempting the insert.
         existing_book = session.scalar(select(Book).where(Book.isbn == isbn))
-
         if existing_book is not None:
             raise ValueError(f"A book with ISBN {isbn} already exists.")
 
@@ -278,76 +260,65 @@ def add_book(
             if author is None:
                 raise ValueError(f"No author found with ID {author_id}.")
             authors.append(author)
-        # Create the Book object first.
+
         book = Book(
             title=title,
             isbn=isbn,
             published_year=published_year,
         )
-
-        # Populate the Book.authors relationship collection.
-        # this is new because we have the many to many relationship now.
+        # Attach the book before further queries can trigger autoflush.
+        session.add(book)
+        # SQLAlchemy creates the book_authors junction rows.
         book.authors.extend(authors)
 
-        # remove duplicates
-        genre_names = set(genre_names)
-
-        # genre_names could be None, so use an empty list in that case.
-        for genre_name in genre_names or []:
-            update_genre_name = genre_name.strip().lower()
-            # now looks with strip and lower
-            genre = session.scalar(select(Genre).where(Genre.name == update_genre_name))
-            # Create the Genre if it does not already exist.
+        for genre_name in cleaned_genre_names:
+            genre = session.scalar(select(Genre).where(Genre.name == genre_name))
             if genre is None:
-                # Create the Genre obj in the genres table if doesn't exist
                 genre = Genre(name=genre_name)
-            # Add the Genre object to the Book's relationship collection(list).
             book.genres.append(genre)
-        # Now that we know author exist and the genres have been added we add
-        # to the books tabled
-        session.add(book)
-        # commit the changes to the database
+
         try:
             session.commit()
         except IntegrityError as error:
             session.rollback()
             raise ValueError(
-                "The book could not be added due to a violation" "of constraints"
+                "The book could not be added because it "
+                "violated a database constraint."
             ) from error
+
         session.refresh(book)
-        # return the book
         return book
 
 
-def add_borrower(
+def add_member(
     name: str,
     email: str,
     phone: str | None = None,
-) -> Borrower:
-    """Register a new borrower and return the created Borrower object."""
+) -> Member:
+    """Register a new member and return the created Member object."""
 
     with Session(engine) as session:
-        borrower = Borrower(
+        member = Member(
             name=name,
             email=email,
             phone=phone,
         )
 
-        session.add(borrower)
+        session.add(member)
 
         try:
             session.commit()
         # handle if a unique value already exists
         except IntegrityError as error:
             session.rollback()
-            raise ValueError("A borrower with that email may already exist.") from error
+            raise ValueError("A member with that email may already exist.") from error
 
         # refresh so that
-        session.refresh(borrower)
-        return borrower
+        session.refresh(member)
+        return member
 
 
-def checkout_book(book_id: int, borrower_id: int, days: int = 14):
+def checkout_book(book_id: int, member_id: int, days: int = 14):
     """
     Check out a book. Sets book.available = False. due_date = today + days.
     Raises ValueError if the book is not available.
@@ -366,12 +337,12 @@ def checkout_book(book_id: int, borrower_id: int, days: int = 14):
         if not book.available:
             raise ValueError(f'"{book.title}" is not currently available.')
 
-        # see if borrower exist
-        borrower = session.get(Borrower, borrower_id)
+        # see if member exist
+        member = session.get(Member, member_id)
 
-        # statement as to not borrower exisiting
-        if borrower is None:
-            raise ValueError(f"Borrower ID {borrower_id} does not exist.")
+        # statement as to not member exisiting
+        if member is None:
+            raise ValueError(f"Member ID {member_id} does not exist.")
 
         # combine the days date with the timedelta
         due_date = date.today() + timedelta(days=days)
@@ -380,7 +351,7 @@ def checkout_book(book_id: int, borrower_id: int, days: int = 14):
         # valid
         new_checkout = Checkout(
             book_id=book.id,
-            borrower_id=borrower.id,
+            member_id=member.id,
             due_date=due_date,
         )
         # set the book obj that we know exist to avaiable to false
