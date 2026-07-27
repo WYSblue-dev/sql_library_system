@@ -113,7 +113,10 @@ class Author(Base):
     # connects to the books table via relationship. Book.author
     # gives us the list of books by one author when handling the author obj
     # author.books think loop through books to get matchs.
-    books: Mapped[list["Book"]] = relationship(back_populates="author")
+    books: Mapped[list["Book"]] = relationship(
+        secondary=book_authors,
+        back_populates="authors",
+    )
 
 
 # Implement the Genre model
@@ -138,31 +141,33 @@ class Genre(Base):
 # Attributes: id (PK), title (required), isbn (unique, required),
 #             published_year (optional), author_id (FK), available (bool, default True)
 # Relationships: author (many-to-one), genres (many-to-many via book_genres)
+
+
+# a member can check out many books one to many
 class Book(Base):
     __tablename__ = "books"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     isbn: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     published_year: Mapped[Optional[int]] = mapped_column(Integer)
-    # the ForeignKey that is pointing at the authors.id integer/primary_key
-    # note this is different from the relationship.
-    author_id: Mapped[int] = mapped_column(
-        Integer,
-        # does this need to be authors?
-        ForeignKey("authors.id"),
-        nullable=False,
-    )
+
+    # Borrower can check out many books. One book one chekcout.
+
     available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # this is the many to one relationship put into action. This accesses the
     # author via the the author_id that is present in the row which must exist.
     # we can access an authors books via book.author.books because of the books
     # that is setup on the author class which points here and queries the db
     # to get all books that match the author_id.
-    author: Mapped["Author"] = relationship(back_populates="books")
+    authors: Mapped[list["Author"]] = relationship(
+        secondary=book_authors,
+        back_populates="books",
+    )
     # genres points back to the association/junction talbe pointing at the
     # Colum we defined
     genres: Mapped[list["Genre"]] = relationship(
-        secondary="book_genres", back_populates="books"
+        secondary=book_genres,
+        back_populates="books",
     )
     checkouts: Mapped[list["Checkout"]] = relationship(back_populates="book")
 
