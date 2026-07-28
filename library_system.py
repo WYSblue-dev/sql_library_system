@@ -508,11 +508,141 @@ def get_popular_genres(limit: int = 3) -> list:
 
 
 def get_available_books() -> list:
-    """Return all Book objects where available == True."""
+    """Return all Book objects where available_copies == True."""
     # implement
     with Session(engine) as session:
-        # retrieve Book table books where the books att/field available
+        # retrieve Book table books where the books att/field available_copies
         # is True.
-        stmt = select(Book).where(Book.available.is_(True))
+        stmt = select(Book).where(Book.available_copies > 0)
         books = session.scalars(stmt).all()
         return books
+
+
+# just a query of the Book table of all instances of books.
+def list_all_books() -> list[Book]:
+    """used to obtain all of the books in the library system"""
+    with Session(engine) as session:
+        # select books table
+        stmt = select(Book)
+        # execute to obtain the rows and values
+        books = session.scalars(stmt).all()
+        return books
+
+
+# search books by title query
+def search_books_by_title(book_title: str) -> list[Book]:
+    """Return a list of books with partical matches to the title entered."""
+    try:
+        # handle the inconsistency of input.
+        book_title = book_title.strip().lower()
+    # raise the error for when the vlaue inputted doesn't meet our constraints
+    # for acception of value look up.
+    except ValueError:
+        print(f"You must enter a title not an integer by itself.")
+    with Session(engine) as session:
+        stmt = select(Book).where(Book.title.ilike(f"%{book_title}%"))
+        books_by_title = session.scalars(stmt).all()
+        return books_by_title
+
+
+# get member borrings by id
+def get_member_current_borrowings(member_id: int) -> list[Member]:
+    """Returns the borrowings a member has by a query of their checkouts that
+    they currently have. Long tail to get to the book.title to display but
+    we'll figure that out on the actual call to this function for display"""
+
+    # have a if None or if that member doesn't exist with the int given and
+    # value error we will have to handle.
+
+    with Session(engine) as session:
+        # this is performing a query on one instance so not all is needed and
+        # the member should then be queried.
+        member = session.get(Member, member_id)
+        print(f"That user doesn't exist by that id - {member_id}")
+
+        # this would handle the instance where the member doesn't exist.
+        if member is None:
+            print(f"That user doesn't exist by that id - {member_id}")
+        stmt = select(Member).where(Member.checkouts > 0)
+        member_borrowings = session.scalars(stmt).all()
+        return member_borrowings
+
+
+# update member email
+def update_member_email(member_id: int) -> Member:
+    """This is going to be expecting a member_id to then access that member
+    obj that we will then use to update the members email and then commit to
+    the database and display the results that are refreshed."""
+    with Session(engine) as session:
+        # need to handle this with valueerror as well as the potential for
+        # somethine slipped my mind.............................
+
+        if member is None:
+            print(f"That user doesn't exist by that id - {member_id}")
+        member = session.get(Member, member_id)
+        updated_member = member.email
+        # ask for the input in the call to this function. We will want to run a
+        # loop there for this.
+        session.refresh(updated_member)
+        return updated_member
+
+
+# the user needs to specify a particular book_id to be able to access the book
+# need to check if the book exist. We can do this with a if None.
+# a design decsion here could be to accept a int or a str. So book name or id
+# should we show the names of books or ids for selection?
+
+
+# remove book
+def remove_book(book_id: int) -> None:
+    """Remove a book from the database idicated by the book_id passed to the
+    parameter. Prints a successful removal. This is editing the table itself.
+    Commit the changes to the table when finished to save."""
+    with Session(engine) as session:
+        # again there is still the decsion to decide how we want to be able to
+        # obtain this value. Maybe that is what we call inside of the menu_cli
+        # in particular.
+
+        # this may be handled in the if None clause
+        book = session.get(Book, book_id)
+        print("This is a redundent error call and I don't know if needed")
+
+        if book is None:
+            # how do we call this again for efficieny?
+            raise ValueError(f"That book doens't exist by that id - {book_id}")
+
+        # this will delete the instance of the book needs flush(refresed so
+        # that the obj is officially removed after the commit())
+        session.delete(book)
+        # save the changes
+        session.commit()
+        # update the cache? Is another way to think about this?
+        session.refresh()
+
+
+# this will be another deletion process. The way we handle this is similar to
+# the remove book. The important thing here as well with the last function is
+# thinking about the CASCADE deletes as this this also remove all related
+# products where applicable. To do so takes a True understanding of the models
+# relational states. If we deleted a book we wouldn't want to delete the member
+# just because we deleted that book or the author.
+
+
+# remove member
+def remove_member(member_id: int) -> None:
+    """Remove the member specified. Will dump that info in the cache in some
+    sense when we call the refresh on the engine. Completely removing the
+    member from the database. The handling of the memeber for checks with the
+    input will take place in the menu_cli_call. Should we need to be able to
+    raise particular errors depends on the errors we are raising. Refer ot the
+    previous functions for guidence and reference."""
+    with Session(engine) as session:
+        # passes the member_id to the .get to access the specific obj. Raise
+        # error if that member obtainment doesn't exist by that int.
+        member = session.get(Member, member_id)
+        session.delete(member)
+        session.commit()
+        session.refresh()
+
+
+# why don't I need use the try block .get().
