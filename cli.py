@@ -21,6 +21,13 @@ from library_system import (
     get_author_by_name,
     # added for the clarity of acknoleding name
     Member,
+    # my added functions that need associated commands
+    list_all_books,
+    search_books_by_title,
+    get_member_current_borrowings,
+    update_member_email,
+    remove_book,
+    remove_member,
 )
 
 
@@ -288,9 +295,15 @@ def main():
         print("5. Search by author")
         print("6. View overdue books")
         print("7. View popular genres")
-        print("8. Quit")
+        print("8. List all books")
+        print("9. Search book by title")
+        print("10. Get members current borrowings")
+        print("11. Update member email")
+        print("12. Remove book")
+        print("13. Remove member")
+        print("14. Quit")
 
-        choice = input("\nChoose an option (1-8): ").strip()
+        choice = input("\nChoose an option (1-14): ").strip()
 
         if choice == "1":
             menu_add_book()
@@ -306,11 +319,29 @@ def main():
             menu_overdue()
         elif choice == "7":
             menu_popular_genres()
+
+        # these particular functions may need the corresponding menu_functions
+        # to be able to handle them correclty and have the right prints. The
+        # function creation in the library_system itself is what handles the
+        # use of the functions from those files. We must print the messages
+        # there for the cli display
         elif choice == "8":
+            menu_list_all_books()
+        elif choice == "9":
+            menu_search_books_by_title()
+        elif choice == "10":
+            menu_get_member_current_borrowings()
+        elif choice == "11":
+            menu_update_member_email()
+        elif choice == "12":
+            menu_remove_book()
+        elif choice == "13":
+            menu_remove_member()
+        elif choice == "14":
             print("Goodbye!")
             break
         else:
-            print("Invalid choice. Please enter 1-8.")
+            print("Invalid choice. Please enter 1-14.")
 
 
 if __name__ == "__main__":
