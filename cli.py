@@ -44,17 +44,26 @@ def menu_add_book():
         print("Title, ISBN, and at least one author are required.")
         return
 
+    # catch year published since required
     while True:
-        year_input = input("Published year (optional): ").strip()
-        if not year_input:
-            year_published = None
-            break
-
         try:
-            year_published = int(year_input)
+            year_published = int(input("Year published: ").strip())
+            if year_published <= 0:
+                raise ValueError
             break
         except ValueError:
-            print("Published year must be a whole number.")
+            print("Year published must be a positive whole number.")
+
+    # catch current copies
+    while True:
+        copies_input = input("Available copies [1]: ").strip() or "1"
+        try:
+            available_copies = int(copies_input)
+            if available_copies < 0:
+                raise ValueError
+            break
+        except ValueError:
+            print("Available copies must be 0 or greater.")
 
     genre_input = input("Genres (separated by commas): ").strip()
     genre_names = [genre.strip() for genre in genre_input.split(",") if genre.strip()]

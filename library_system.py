@@ -209,22 +209,45 @@ def init_db():
 # ============================================================
 
 
-def add_author(name: str, bio: str = None):
+def add_author(
+    name: str,
+    # this pipe with None = None is what is setup to be able to protect the
+    # db in a sense. Bio is typed as a str if a value is entered otherwise
+    # default to None
+    bio: str | None = None,
+):
     """Add a new author. Returns the created Author object."""
+    name = name.strip()
+    # if there is a value present setup correctly.
+    bio = bio.strip() if bio else None
+
     with Session(engine) as session:
-        author = Author(name=name, bio=bio)
-        session.add(author)
-        session.commit()
-        session.refresh(author)
-        return author
+        # we need to check if the author already exist.
+        stmt = select(Author)
+        authors = session.scalars(stmt).all()
+        for author in authors:
+            if author.name == name:
+                raise ValueError("This name is already taken. Try again.")
+        else:
+            new_author = Author(name=name, bio=bio)
+            # add the new author
+            session.add(new_author)
+            # save the changes
+            session.commit()
+            session.refresh(new_author)
+            # return new author
+            return new_author
 
 
 def add_book(
     title: str,
     isbn: str,
     author_ids: list[int],
-    year_published: int = None,
-    genre_names: list = None,
+    copies_count: int,
+    year_published: int,
+    # default value of 1. Why enter books not had?(Could design decision)
+    available_copies: int = 1,
+    genre_names: list[str] | None = None,
 ):
     """
     Add a new book. Assigns genres by name (creates genre if it doesn't exist yet).
@@ -241,6 +264,12 @@ def add_book(
 
     if not author_ids:
         raise ValueError("A book must have at least one author.")
+
+    if year_published <= 0:
+        raise ValueError("Year published must be greater than 0.")
+
+    if available_copies < 0:
+        raise ValueError("Available copies cannot be negative.")
 
     # Remove duplicate IDs while preserving their order.
     unique_author_ids = list(dict.fromkeys(author_ids))
@@ -268,6 +297,7 @@ def add_book(
             title=title,
             isbn=isbn,
             year_published=year_published,
+            available_copies=copies_count,
         )
         # Attach the book before further queries can trigger autoflush.
         session.add(book)
