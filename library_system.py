@@ -461,6 +461,11 @@ def return_book(checkout_id: int):
 def find_books_by_author(author_name: str) -> list:
     """Return all books whose author name contains author_name (case-insensitive)."""
     # implement — use LIKE or ilike for partial matching
+
+    author_name = author_name.strip()
+    if not author_name:
+        raise ValueError("An author name is required.")
+
     with Session(engine) as session:
         stmt = (
             # select the Book table
@@ -477,12 +482,7 @@ def find_books_by_author(author_name: str) -> list:
                 Author.name.ilike(f"%{author_name}%"),
             )
         )
-        # Scalars are what we grab from the ORM Book, Genre etc...
-        # Hence the reason we call .all() becuase we want to collect them in
-        # the list
-        books = session.scalars(stmt).all()
-        # return the list of the books
-        return books
+        return session.scalars(stmt).unique().all()
 
 
 def get_author_by_name(name: str) -> Author | None:
