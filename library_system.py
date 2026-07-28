@@ -648,34 +648,43 @@ def remove_book(book_id: int) -> None:
     """Remove a book from the database idicated by the book_id passed to the
     parameter. Prints a successful removal. This is editing the table itself.
     Commit the changes to the table when finished to save."""
+
+
+def remove_book(book_id: int) -> None:
     with Session(engine) as session:
-        # again there is still the decsion to decide how we want to be able to
-        # obtain this value. Maybe that is what we call inside of the menu_cli
-        # in particular.
-
-        # this may be handled in the if None clause
+        # get book by id
         book = session.get(Book, book_id)
-        print("This is a redundent error call and I don't know if needed")
 
+        # check if exist
         if book is None:
-            # how do we call this again for efficieny?
-            raise ValueError(f"That book doens't exist by that id - {book_id}")
+            # raise ValueError if not
+            raise ValueError(f"Book ID {book_id} does not exist.")
+        # execute this query in the scalar call for one obj.
+        active_checkout = session.scalar(
+            select(Checkout).where(
+                Checkout.book_id == book_id,
+                Checkout.return_date.is_(None),
+            )
+        )
 
-        # this will delete the instance of the book needs flush(refresed so
-        # that the obj is officially removed after the commit())
+        # if this is an avtive checkout meaning members have this book.
+        if active_checkout is not None:
+            # raise error since it is borrowed.
+            raise ValueError(
+                f'"{book.title}" cannot be removedwhile it is currently borrowed.'
+            )
+        # execute the query in the scalars
+        checkout_history = session.scalars(
+            select(Checkout).where(Checkout.book_id == book_id)
+        ).all()
+        # loop through the history
+        for checkout in checkout_history:
+            # delete the history.
+            session.delete(checkout)
+        # delete the book itself
         session.delete(book)
-        # save the changes
+        # commit the changes so they now are refelcted in the database
         session.commit()
-        # update the cache? Is another way to think about this?
-        session.refresh()
-
-
-# this will be another deletion process. The way we handle this is similar to
-# the remove book. The important thing here as well with the last function is
-# thinking about the CASCADE deletes as this this also remove all related
-# products where applicable. To do so takes a True understanding of the models
-# relational states. If we deleted a book we wouldn't want to delete the member
-# just because we deleted that book or the author.
 
 
 # remove member
