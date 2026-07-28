@@ -40,11 +40,11 @@ def menu_add_book():
     while True:
         year_input = input("Published year (optional): ").strip()
         if not year_input:
-            published_year = None
+            year_published = None
             break
 
         try:
-            published_year = int(year_input)
+            year_published = int(year_input)
             break
         except ValueError:
             print("Published year must be a whole number.")
@@ -69,7 +69,7 @@ def menu_add_book():
             title=title,
             isbn=isbn,
             author_ids=author_ids,
-            published_year=published_year,
+            year_published=year_published,
             genre_names=genre_names,
         )
     except ValueError as error:

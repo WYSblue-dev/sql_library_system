@@ -112,7 +112,7 @@ class Genre(Base):
 
 # Implement the Book model
 # Attributes: id (PK), title (required), isbn (unique, required),
-#             published_year (optional), author_id (FK), available (bool, default True)
+#             year_published (optional), author_id (FK), available_copies (bool, default True)
 # Relationships: author (many-to-one), genres (many-to-many via book_genres)
 
 
@@ -122,11 +122,11 @@ class Book(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     isbn: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    published_year: Mapped[Optional[int]] = mapped_column(Integer)
+    year_published: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Member can check out many books. One book one chekcout.
 
-    available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    available_copies: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     # this is the many to one relationship put into action. This accesses the
     # author via the the author_id that is present in the row which must exist.
     # we can access an authors books via book.author.books because of the books
@@ -220,7 +220,7 @@ def add_book(
     title: str,
     isbn: str,
     author_ids: list[int],
-    published_year: int = None,
+    year_published: int = None,
     genre_names: list = None,
 ):
     """
@@ -264,7 +264,7 @@ def add_book(
         book = Book(
             title=title,
             isbn=isbn,
-            published_year=published_year,
+            year_published=year_published,
         )
         # Attach the book before further queries can trigger autoflush.
         session.add(book)
