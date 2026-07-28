@@ -33,7 +33,7 @@ A command-line library management system backed by SQLAlchemy. You'll implement:
 
 - **Author**: id, name, bio (optional)
 - **Genre**: id, name (unique)
-- **Book**: id, title, isbn (unique), published_year, author_id (FK), available (bool). Many-to-many with Genre.
+- **Book**: id, title, isbn (unique), published_year, author_id (FK), available (int). Many-to-many with Genre.
 - **Member**: id, name, email (unique), phone (optional)
 - **Checkout**: id, book_id (FK), member_id (FK), checkout_date, due_date, return_date (NULL if not returned)
 

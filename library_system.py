@@ -111,7 +111,7 @@ class Genre(Base):
 
 # Implement the Book model
 # Attributes: id (PK), title (required), isbn (unique, required),
-#             year_published (optional), author_id (FK), available_copies (bool, default True)
+#             year_published (optional), author_id (FK), available_copies (int, nullable=False)
 # Relationships: author (many-to-one), genres (many-to-many via book_genres)
 
 
@@ -323,7 +323,7 @@ def add_member(
 
 def checkout_book(book_id: int, member_id: int, days: int = 14):
     """
-    Check out a book. Sets book.available_copies = False. due_date = today + days.
+    Check out a book. Sets book.available_copies = int. due_date = today + days.
     Raises ValueError if the book is not available_copies.
     Returns the created Checkout object.
     """
@@ -381,7 +381,7 @@ def checkout_book(book_id: int, member_id: int, days: int = 14):
 
 def return_book(checkout_id: int):
     """
-    Return a book. Sets book.available_copies = True, sets return_date = today.
+    Return a book. Increments available_copies += 1, sets return_date = today.
     Returns the updated Checkout object.
     """
     # implement
@@ -508,7 +508,7 @@ def get_popular_genres(limit: int = 3) -> list:
 
 
 def get_available_books() -> list:
-    """Return all Book objects where available_copies == True."""
+    """Return all Book objects where available_copies > 0."""
     # implement
     with Session(engine) as session:
         # retrieve Book table books where the books att/field available_copies
