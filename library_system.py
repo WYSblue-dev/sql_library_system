@@ -329,6 +329,16 @@ def add_member(
     phone: str | None = None,
 ) -> Member:
     """Register a new member and return the created Member object."""
+    name = name.strip()
+    email = email.strip().lower()
+    # set phone to None if no value
+    phone = phone.strip() if phone else None
+
+    if not name:
+        raise ValueError("A member name is required")
+
+    if not email:
+        raise ValueError("A email is required")
 
     with Session(engine) as session:
         member = Member(
