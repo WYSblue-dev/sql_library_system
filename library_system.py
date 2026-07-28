@@ -152,7 +152,10 @@ class Member(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     phone: Mapped[Optional[str]] = mapped_column(String)
-    # member can have many checkouts
+    # member can have many checkouts need to look at the relationship to under
+    # -stand where this value comes from. Would work in conjuction with the
+    # checkout/borrowing. I opt to like the use of checkouts and not muddy
+    # the concept of the lookup by using borrowings but we can make it work.
     checkouts: Mapped[list["Checkout"]] = relationship(back_populates="member")
     membership_date: Mapped[date] = mapped_column(
         Date,
@@ -420,10 +423,6 @@ def find_books_by_author(author_name: str) -> list:
     # implement — use LIKE or ilike for partial matching
     with Session(engine) as session:
         stmt = (
-            # might be able to do this differently now since there is a means
-            # to be able to looks at multiple authors on one book. So may find
-            # a book that has one author. Maybe we could perform pattern
-            # matching here.
             # select the Book table
             select(Book)
             # joins the Book to the authors table privided the relationship
@@ -434,6 +433,7 @@ def find_books_by_author(author_name: str) -> list:
             # We use .ilike for the insensitive casing.
             .where(
                 # percentage gives partial pattern matching.
+                # co authored book can appear twice and needs fixed.
                 Author.name.ilike(f"%{author_name}%"),
             )
         )
@@ -446,12 +446,16 @@ def find_books_by_author(author_name: str) -> list:
 
 
 def get_author_by_name(name: str) -> Author | None:
+    normalized_name = name.strip().lower()
+
     with Session(engine) as session:
-        stmt = select(func.lower(Author.name) == name.strip().lower())
-        return session.scalar(stmt)
+        stmt = select(Author).where(
+            func.lower(Author.name) == normalized_name,
+        )
+        return session.scalars(stmt).first()
 
 
-def get_overdue_books() -> list:
+def get_overdue_books() -> list[Checkout]:
     """Return all Checkout objects where due_date < today and return_date is None."""
     # implement
     with Session(engine) as session:

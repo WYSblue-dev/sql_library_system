@@ -196,16 +196,84 @@ def menu_return():
 def menu_search_by_author():
     """Prompt for author name and display matching books."""
     # TODO: Prompt for author_name, call find_books_by_author(), print results
+    while True:
+        author_search = "Type in the author you are looking for: "
+        author_name = str(input(author_search)).strip().lower()
+        try:
+            books = find_books_by_author(author_name)
+            print(f"Author books by {author_name.title()}:")
+            for book in books:
+                print(f"{book.title.upper()}")
+            break
+        except ValueError:
+            print("Please enter a valid name. Try again.")
+            continue
 
 
 def menu_overdue():
     """Display all overdue checkouts."""
     # TODO: Call get_overdue_books() and print results
+    overdue_books = get_overdue_books()
+    for checkout in overdue_books:
+        print(
+            f"Overdue book title - {checkout.book.title}"
+            f"\nOverdue member name - {checkout.member.name}\nDue Date - {checkout.due_date}"
+        )
 
 
 def menu_popular_genres():
     """Display the most popular genres by checkout count."""
     # TODO: Call get_popular_genres() and print results
+    popular_genres = get_popular_genres()
+    print("Most popular genres by count:")
+    for genre in popular_genres:
+        print(f"{genre}")
+
+
+# my functions that I have added
+
+
+def menu_list_all_books():
+    """List all of the books in the system. Makes a call to list_all_books."""
+    books = list_all_books()
+    print("BOOK TITLES:")
+    for place, book in enumerate(books, start=1):
+        print(f"{place}. TITLE: {book.title}")
+
+
+def menu_search_books_by_title(book_title: str):
+    """Search all books with partial matching to titles. We should set a limit
+    inside of the library system to be able to handle the mass amounts of
+    potential short matches. Kinda like a fuzzy search?"""
+    books = search_books_by_title()
+    print(f"SIMILAR BOOKS BY TITLE {book_title}:")
+    for place, book in enumerate(books, start=1):
+        print(f"{place}. TITLE: {book.title}")
+
+
+def menu_get_member_current_borrowings(member_id: int):
+    """Displays all of the checkouts that a current member has if any. Makes a
+    call to the get_member_current_borrowings."""
+    member = get_member_current_borrowings()
+    print()
+
+
+def menu_update_member_email(member_id: int):
+    """Update the members email. Makes a call to update_member_email."""
+    update_member = update_member_email()
+    print()
+
+
+def menu_remove_book(book_id: int):
+    """Remove a book from the books table. Makes a call to remove_book."""
+    book_removed = remove_book()
+    print()
+
+
+def menu_remove_member(member_id: int):
+    """Remove a member from the members table. Makes a call to remove_member."""
+    member_removed = remove_member()
+    print()
 
 
 def main():
