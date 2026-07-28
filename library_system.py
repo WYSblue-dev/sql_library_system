@@ -572,59 +572,69 @@ def list_all_books() -> list[Book]:
 # search books by title query
 def search_books_by_title(book_title: str) -> list[Book]:
     """Return a list of books with partical matches to the title entered."""
-    try:
-        # handle the inconsistency of input.
-        book_title = book_title.strip().lower()
-    # raise the error for when the vlaue inputted doesn't meet our constraints
-    # for acception of value look up.
-    except ValueError:
-        print(f"You must enter a title not an integer by itself.")
+    book_title = book_title.strip()
+
+    if not book_title:
+        raise ValueError("A title search term is required.")
+
     with Session(engine) as session:
-        stmt = select(Book).where(Book.title.ilike(f"%{book_title}%"))
-        books_by_title = session.scalars(stmt).all()
-        return books_by_title
+        stmt = (
+            select(Book).where(Book.title.ilike(f"%{book_title}%")).order_by(Book.title)
+        )
+
+        return session.scalars(stmt).all()
 
 
 # get member borrings by id
-def get_member_current_borrowings(member_id: int) -> list[Member]:
+def get_member_current_borrowings(member_id: int) -> list[Checkout]:
     """Returns the borrowings a member has by a query of their checkouts that
     they currently have. Long tail to get to the book.title to display but
     we'll figure that out on the actual call to this function for display"""
-
-    # have a if None or if that member doesn't exist with the int given and
-    # value error we will have to handle.
-
     with Session(engine) as session:
         # this is performing a query on one instance so not all is needed and
         # the member should then be queried.
         member = session.get(Member, member_id)
-        print(f"That user doesn't exist by that id - {member_id}")
-
-        # this would handle the instance where the member doesn't exist.
         if member is None:
-            print(f"That user doesn't exist by that id - {member_id}")
-        stmt = select(Member).where(Member.checkouts > 0)
-        member_borrowings = session.scalars(stmt).all()
-        return member_borrowings
+            raise ValueError(f"Member ID {member_id} does not exist.")
+        # selectinload and selectinload?
+        stmt = (
+            # select checkout table
+            select(Checkout)
+            # comparison to the member_id given
+            .where(
+                Checkout.member_id == member_id,
+                # give the return date for that chekout obj tied to that mem
+                Checkout.return_date.is_(None),
+                # order by the due date
+            ).order_by(Checkout.due_date)
+        )
+        return session.scalars(stmt).all()
 
 
 # update member email
-def update_member_email(member_id: int) -> Member:
+def update_member_email(member_id: int, new_email: str) -> Member:
     """This is going to be expecting a member_id to then access that member
     obj that we will then use to update the members email and then commit to
     the database and display the results that are refreshed."""
+    if not new_email:
+        raise ValueError("Email is required!")
+
     with Session(engine) as session:
-        # need to handle this with valueerror as well as the potential for
-        # somethine slipped my mind.............................
+        member = session.get(Member, member_id)
 
         if member is None:
-            print(f"That user doesn't exist by that id - {member_id}")
-        member = session.get(Member, member_id)
-        updated_member = member.email
-        # ask for the input in the call to this function. We will want to run a
-        # loop there for this.
-        session.refresh(updated_member)
-        return updated_member
+            raise ValueError(f"That user doesn't exist by that id - {member_id}")
+
+        member.email = new_email
+        try:
+            session.commit()
+        except IntegrityError as error:
+            session.rollback()
+            raise ValueError(
+                f"A member with email {new_email} aldready exists."
+            ) from error
+        session.refresh(member)
+        return member
 
 
 # the user needs to specify a particular book_id to be able to access the book

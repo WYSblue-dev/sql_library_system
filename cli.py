@@ -270,8 +270,14 @@ def menu_search_books_by_title(book_title: str):
 def menu_get_member_current_borrowings(member_id: int):
     """Displays all of the checkouts that a current member has if any. Makes a
     call to the get_member_current_borrowings."""
-    member = get_member_current_borrowings()
-    print()
+    checkouts = get_member_current_borrowings(member_id=member_id)
+    for checkout in checkouts:
+        print(
+            f"Checkout ID: {checkout.id} | "
+            f"Book: {checkout.book.title} | "
+            f"Checked out: {checkout.checkout_date} | "
+            f"Due: {checkout.due_date}"
+        )
 
 
 def menu_update_member_email(member_id: int):
