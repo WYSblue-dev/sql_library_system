@@ -9,7 +9,6 @@ from sqlalchemy import (
     create_engine,
     String,
     Integer,
-    Boolean,
     ForeignKey,
     Table,
     Column,
@@ -194,6 +193,7 @@ class Checkout(Base):
     # on the books that they have checked out. Books that are checked are
     # assumed to only have one. This is due to the potential of only one book.
     member: Mapped["Member"] = relationship(back_populates="checkouts")
+    # need to add a means to decremeant the books available_copies
 
 
 def init_db():
@@ -320,8 +320,8 @@ def add_member(
 
 def checkout_book(book_id: int, member_id: int, days: int = 14):
     """
-    Check out a book. Sets book.available = False. due_date = today + days.
-    Raises ValueError if the book is not available.
+    Check out a book. Sets book.available_copies = False. due_date = today + days.
+    Raises ValueError if the book is not available_copies.
     Returns the created Checkout object.
     """
     if days <= 0:
@@ -333,8 +333,8 @@ def checkout_book(book_id: int, member_id: int, days: int = 14):
         if book is None:
             raise ValueError(f"Book ID {book_id} does not exist.")
 
-        # see if book available
-        if not book.available:
+        # see if book available_copies
+        if not book.available_copies:
             raise ValueError(f'"{book.title}" is not currently available.')
 
         # see if member exist
@@ -355,7 +355,7 @@ def checkout_book(book_id: int, member_id: int, days: int = 14):
             due_date=due_date,
         )
         # set the book obj that we know exist to avaiable to false
-        book.available = False
+        book.available_copies -= 1
         # now add the checkout to that database
         session.add(new_checkout)
         # save with rollback protection
@@ -378,7 +378,7 @@ def checkout_book(book_id: int, member_id: int, days: int = 14):
 
 def return_book(checkout_id: int):
     """
-    Return a book. Sets book.available = True, sets return_date = today.
+    Return a book. Sets book.available_copies = True, sets return_date = today.
     Returns the updated Checkout object.
     """
     # implement
@@ -401,8 +401,8 @@ def return_book(checkout_id: int):
 
         # set the date to today
         checkout.return_date = date.today()
-        # modify the book available attribute/field from the book in session
-        book.available = True
+        # modify the book available_copies attribute/field from the book in session
+        book.available_copies += 1
 
         session.commit()
         # update the checkout object in the session so it's returned correctly.
