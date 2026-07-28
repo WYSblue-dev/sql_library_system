@@ -696,6 +696,15 @@ def remove_member(member_id: int) -> None:
     raise particular errors depends on the errors we are raising. Refer ot the
     previous functions for guidence and reference."""
     with Session(engine) as session:
+        member = session.get(Member, member_id)
+
+    if member is None:
+        raise ValueError(f"Member ID {member_id} does not exist.")
+
+        # cascade="all, delete-orphan" could be used on the relationship
+
+        Checkout.member_id == member_id
+        Checkout.return_date.is_(None)
         # passes the member_id to the .get to access the specific obj. Raise
         # error if that member obtainment doesn't exist by that int.
         member = session.get(Member, member_id)
