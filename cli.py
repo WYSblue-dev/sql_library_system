@@ -23,9 +23,6 @@ from library_system import (
     list_all_books,
     search_books_by_title,
     get_member_current_borrowings,
-    update_member_email,
-    remove_book,
-    remove_member,
 )
 
 
@@ -287,7 +284,7 @@ def menu_search_books_by_title():
         print(f"ID: {book.id} | " f"Title: {book.title}")
 
 
-def menu_get_member_current_borrowings(member_id: int):
+def menu_get_member_current_borrowings():
     """Displays all of the checkouts that a current member has if any. Makes a
     call to the get_member_current_borrowings."""
     try:
@@ -314,22 +311,23 @@ def menu_get_member_current_borrowings(member_id: int):
         )
 
 
-def menu_update_member_email(member_id: int):
-    """Update the members email. Makes a call to update_member_email."""
-    update_member_email(member_id=member_id)
-    print("Member successfully removed.")
+def menu_search_books():
+    """Let the user list or search for books."""
+    print("\n=== Search Books ===")
+    print("1. List all books")
+    print("2. Search by title")
+    print("3. Search by author")
 
+    choice = input("Choose a search option (1-3): ").strip()
 
-def menu_remove_book(book_id: int):
-    """Remove a book from the books table. Makes a call to remove_book."""
-    remove_book(book_id=book_id)
-    print("Book succefulle removed!")
-
-
-def menu_remove_member(member_id: int):
-    """Remove a member from the members table. Makes a call to remove_member."""
-    member_removed = remove_member()
-    print()
+    if choice == "1":
+        menu_list_all_books()
+    elif choice == "2":
+        menu_search_books_by_title()
+    elif choice == "3":
+        menu_search_by_author()
+    else:
+        print("Invalid search option.")
 
 
 def main():
@@ -338,28 +336,22 @@ def main():
     while True:
         print("\n=== Library Management System ===")
         print("1. Add a book")
-        print("2. Register a member")
-        print("3. Check out a book")
-        print("4. Return a book")
-        print("5. Search by author")
-        print("6. View overdue books")
-        print("7. View popular genres")
-        print("8. List all books")
-        print("9. Search book by title")
-        print("10. Get members current borrowings")
-        print("11. Update member email")
-        print("12. Remove book")
-        print("13. Remove member")
-        print("14. Quit")
+        print("2. Add a member")
+        print("3. Search books")
+        print("4. Check out a book")
+        print("5. Return a book")
+        print("6. View member's borrowings")
+        print("7. View overdue books")
+        print("8. Exit")
 
-        choice = input("\nChoose an option (1-14): ").strip()
+        choice = input("\nChoose an option (1-8): ").strip()
 
         if choice == "1":
             menu_add_book()
         elif choice == "2":
             menu_add_member()
         elif choice == "3":
-            menu_search_books_by_title()
+            menu_search_books()
         elif choice == "4":
             menu_checkout()
         elif choice == "5":
@@ -371,28 +363,8 @@ def main():
         elif choice == "8":
             print("Goodbye!")
             break
-            # these particular functions may need the corresponding menu_functions
-        # to be able to handle them correclty and have the right prints. The
-        # function creation in the library_system itself is what handles the
-        # use of the functions from those files. We must print the messages
-        # there for the cli display
-        elif choice == "8":
-            menu_list_all_books()
-        elif choice == "9":
-            menu_search_books_by_title()
-        elif choice == "10":
-            menu_get_member_current_borrowings()
-        elif choice == "11":
-            menu_update_member_email()
-        elif choice == "12":
-            menu_remove_book()
-        elif choice == "13":
-            menu_remove_member()
-        elif choice == "14":
-            print("Goodbye!")
-            break
         else:
-            print("Invalid choice. Please enter 1-14.")
+            print("Invalid choice. Please enter 1-8.")
 
 
 if __name__ == "__main__":

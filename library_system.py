@@ -29,6 +29,7 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
     Session,
+    selectinload,
 )
 
 # Optional is for when we want a value to be tranlated between python and sql
@@ -246,7 +247,6 @@ def add_book(
     title: str,
     isbn: str,
     author_ids: list[int],
-    copies_count: int,
     year_published: int,
     # default value of 1. Why enter books not had?(Could design decision)
     available_copies: int = 1,
@@ -300,7 +300,7 @@ def add_book(
             title=title,
             isbn=isbn,
             year_published=year_published,
-            available_copies=copies_count,
+            available_copies=available_copies,
         )
         # Attach the book before further queries can trigger autoflush.
         session.add(book)
@@ -509,6 +509,7 @@ def get_overdue_books() -> list[Checkout]:
         # due_date vs. the dates day.
         stmt = (
             select(Checkout)
+            .options(selectinload(Checkout.book), selectinload(Checkout.member))
             .where(
                 # we can simply check against todays date
                 Checkout.due_date < date.today(),
@@ -601,6 +602,10 @@ def get_member_current_borrowings(member_id: int) -> list[Checkout]:
         stmt = (
             # select checkout table
             select(Checkout)
+            .options(
+                selectinload(Checkout.book),
+                selectinload(Checkout.member),
+            )
             # comparison to the member_id given
             # what about using .options here? selectinload(Checkout.book), selectinload(Checkout.member),??????
             .where(
@@ -608,7 +613,8 @@ def get_member_current_borrowings(member_id: int) -> list[Checkout]:
                 # give the return date for that chekout obj tied to that mem
                 Checkout.return_date.is_(None),
                 # order by the due date
-            ).order_by(Checkout.due_date)
+            )
+            .order_by(Checkout.due_date)
         )
         return session.scalars(stmt).all()
 
@@ -696,19 +702,28 @@ def remove_member(member_id: int) -> None:
     with Session(engine) as session:
         member = session.get(Member, member_id)
 
-    if member is None:
-        raise ValueError(f"Member ID {member_id} does not exist.")
+        if member is None:
+            raise ValueError(f"Member ID {member_id} does not exist.")
 
-        # cascade="all, delete-orphan" could be used on the relationship
+        active_checkout = session.scalar(
+            select(Checkout).where(
+                Checkout.member_id == member_id,
+                Checkout.return_date.is_(None),
+            )
+        )
 
-        Checkout.member_id == member_id
-        Checkout.return_date.is_(None)
-        # passes the member_id to the .get to access the specific obj. Raise
-        # error if that member obtainment doesn't exist by that int.
-        member = session.get(Member, member_id)
+        if active_checkout is not None:
+            raise ValueError(
+                f'"{member.name}" cannot be removed while '
+                "they have active borrowings."
+            )
+
+        checkout_history = session.scalars(
+            select(Checkout).where(Checkout.member_id == member_id)
+        ).all()
+
+        for checkout in checkout_history:
+            session.delete(checkout)
+
         session.delete(member)
         session.commit()
-        session.refresh()
-
-
-# why don't I need use the try block .get().
