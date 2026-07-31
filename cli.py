@@ -19,8 +19,6 @@ from library_system import (
     get_available_books,
     # added a helper to obtain the author based on existence
     get_author_by_name,
-    # added for the clarity of acknoleding name
-    Member,
     # my added functions that need associated commands
     list_all_books,
     search_books_by_title,
@@ -86,6 +84,7 @@ def menu_add_book():
             isbn=isbn,
             author_ids=author_ids,
             year_published=year_published,
+            available_copies=available_copies,
             genre_names=genre_names,
         )
     except ValueError as error:
@@ -214,9 +213,14 @@ def menu_search_by_author():
     # TODO: Prompt for author_name, call find_books_by_author(), print results
     while True:
         author_search = "Type in the author you are looking for: "
-        author_name = str(input(author_search)).strip().lower()
+        author_name = input(author_search).strip().lower()
         try:
             books = find_books_by_author(author_name)
+
+            if not books:
+                print(f'No books found for "{author_name}".')
+                return
+
             print(f"Author books by {author_name.title()}:")
             for book in books:
                 print(f"{book.title.upper()}")
@@ -230,6 +234,11 @@ def menu_overdue():
     """Display all overdue checkouts."""
     # TODO: Call get_overdue_books() and print results
     overdue_books = get_overdue_books()
+
+    if not overdue_books:
+        print("There are no overdue books.")
+        return
+
     for checkout in overdue_books:
         print(
             f"Overdue book title - {checkout.book.title}"
@@ -241,9 +250,8 @@ def menu_popular_genres():
     """Display the most popular genres by checkout count."""
     # TODO: Call get_popular_genres() and print results
     popular_genres = get_popular_genres()
-    print("Most popular genres by count:")
-    for genre in popular_genres:
-        print(f"{genre}")
+    for genre_name, count in popular_genres:
+        print(f"{genre_name}: {count} checkouts")
 
 
 # my functions that I have added
@@ -257,39 +265,65 @@ def menu_list_all_books():
         print(f"{place}. TITLE: {book.title}")
 
 
-def menu_search_books_by_title(book_title: str):
+def menu_search_books_by_title():
     """Search all books with partial matching to titles. We should set a limit
     inside of the library system to be able to handle the mass amounts of
     potential short matches. Kinda like a fuzzy search?"""
-    books = search_books_by_title()
-    print(f"SIMILAR BOOKS BY TITLE {book_title}:")
-    for place, book in enumerate(books, start=1):
-        print(f"{place}. TITLE: {book.title}")
+    book_title = input("Enter part of the book title: ").strip()
+
+    try:
+        books = search_books_by_title(book_title)
+    except ValueError as error:
+        print(error)
+        return
+
+    if not books:
+        print(f'No books matched "{book_title}".')
+        return
+
+    print("\nMatching books:")
+
+    for book in books:
+        print(f"ID: {book.id} | " f"Title: {book.title}")
 
 
 def menu_get_member_current_borrowings(member_id: int):
     """Displays all of the checkouts that a current member has if any. Makes a
     call to the get_member_current_borrowings."""
-    checkouts = get_member_current_borrowings(member_id=member_id)
+    try:
+        member_id = int(input("Member ID: ").strip())
+    except ValueError:
+        print("Member ID must be a whole number.")
+        return
+
+    try:
+        checkouts = get_member_current_borrowings(member_id)
+    except ValueError as error:
+        print(error)
+        return
+
+    if not checkouts:
+        print("This member has no current borrowings.")
+        return
+
     for checkout in checkouts:
         print(
             f"Checkout ID: {checkout.id} | "
             f"Book: {checkout.book.title} | "
-            f"Checked out: {checkout.checkout_date} | "
             f"Due: {checkout.due_date}"
         )
 
 
 def menu_update_member_email(member_id: int):
     """Update the members email. Makes a call to update_member_email."""
-    update_member = update_member_email()
-    print()
+    update_member_email(member_id=member_id)
+    print("Member successfully removed.")
 
 
 def menu_remove_book(book_id: int):
     """Remove a book from the books table. Makes a call to remove_book."""
-    book_removed = remove_book()
-    print()
+    remove_book(book_id=book_id)
+    print("Book succefulle removed!")
 
 
 def menu_remove_member(member_id: int):
@@ -325,17 +359,19 @@ def main():
         elif choice == "2":
             menu_add_member()
         elif choice == "3":
-            menu_checkout()
+            menu_search_books_by_title()
         elif choice == "4":
-            menu_return()
+            menu_checkout()
         elif choice == "5":
-            menu_search_by_author()
+            menu_return()
         elif choice == "6":
-            menu_overdue()
+            menu_get_member_current_borrowings()
         elif choice == "7":
-            menu_popular_genres()
-
-        # these particular functions may need the corresponding menu_functions
+            menu_overdue()
+        elif choice == "8":
+            print("Goodbye!")
+            break
+            # these particular functions may need the corresponding menu_functions
         # to be able to handle them correclty and have the right prints. The
         # function creation in the library_system itself is what handles the
         # use of the functions from those files. We must print the messages

@@ -221,6 +221,9 @@ def add_author(
     # if there is a value present setup correctly.
     bio = bio.strip() if bio else None
 
+    if not name:
+        raise ValueError("An author name is required")
+
     with Session(engine) as session:
         # we need to check if the author already exist.
         stmt = select(Author)
@@ -480,7 +483,7 @@ def find_books_by_author(author_name: str) -> list:
                 # percentage gives partial pattern matching.
                 # co authored book can appear twice and needs fixed.
                 Author.name.ilike(f"%{author_name}%"),
-            )
+            ).order_by(Book.title)
         )
         return session.scalars(stmt).unique().all()
 
@@ -504,14 +507,18 @@ def get_overdue_books() -> list[Checkout]:
         # that haven't been returned in time. We could also use the books with
         # the days and expected day back maybe? No just check back in the
         # due_date vs. the dates day.
-        stmt = select(Checkout).where(
-            # we can simply check against todays date
-            Checkout.due_date < date.today(),
-            # This is another condition implemented for the purpose of checking
-            # if the attribute return_date is None. Would be used in the
-            # instance where the return_date hasn't been established.(still
-            # not returned/still active)
-            Checkout.return_date.is_(None),
+        stmt = (
+            select(Checkout)
+            .where(
+                # we can simply check against todays date
+                Checkout.due_date < date.today(),
+                # This is another condition implemented for the purpose of checking
+                # if the attribute return_date is None. Would be used in the
+                # instance where the return_date hasn't been established.(still
+                # not returned/still active)
+                Checkout.return_date.is_(None),
+            )
+            .order_by(Checkout.due_date)
         )
         # using scalers here is that execution through a table or tables to
         # retrieve all of the relative objs or rows hence .all() to get list
@@ -524,27 +531,21 @@ def get_popular_genres(limit: int = 3) -> list:
     # implement — needs a join through Book to Checkout
     # Assign the Session Class we use for working with the engine as session
     with Session(engine) as session:
-        # this func we needed to import in the top of the file from sqlalchemy.
-        # This is the equivlent to sqlalchemy.
-        checkout_count = func.count(Checkout.id)
-        # stmt to query.
+        checkout_count = func.count(Checkout.id).label("checkout_count")
+
         stmt = (
-            select(Genre)
+            select(
+                Genre.name,
+                checkout_count,
+            )
             .join(Genre.books)
-            # why do we use 2x joins here? This is because we want to see a
-            # query result that is from the combined tables right? So we want
-            # to see the Genres that pattern match in correlation with the book
-            # by the checkouts though.
             .join(Book.checkouts)
-            # group because COUNT() must calculate a separate checkout count
-            # for each genre.
             .group_by(Genre.id, Genre.name)
-            # Order by
             .order_by(checkout_count.desc())
             .limit(limit)
         )
-        popular_genres = session.scalars(stmt).all()
-        return popular_genres
+
+        return session.execute(stmt).all()
 
 
 def get_available_books() -> list:
@@ -601,6 +602,7 @@ def get_member_current_borrowings(member_id: int) -> list[Checkout]:
             # select checkout table
             select(Checkout)
             # comparison to the member_id given
+            # what about using .options here? selectinload(Checkout.book), selectinload(Checkout.member),??????
             .where(
                 Checkout.member_id == member_id,
                 # give the return date for that chekout obj tied to that mem
@@ -643,14 +645,10 @@ def update_member_email(member_id: int, new_email: str) -> Member:
 # should we show the names of books or ids for selection?
 
 
-# remove book
 def remove_book(book_id: int) -> None:
     """Remove a book from the database idicated by the book_id passed to the
     parameter. Prints a successful removal. This is editing the table itself.
     Commit the changes to the table when finished to save."""
-
-
-def remove_book(book_id: int) -> None:
     with Session(engine) as session:
         # get book by id
         book = session.get(Book, book_id)
