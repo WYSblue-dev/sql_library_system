@@ -178,8 +178,8 @@ def menu_checkout():
         # Nice print out statement
         print(f'"{selected_book.title}" was successfully checked out.')
         print(
-            f"Here is your checkout ID. Don't forget this as you'll need it"
-            "for the return."
+            f"Here is your checkout ID {checkout.id}. Don't forget this as you'll need it"
+            " for the return."
         )
         # express due date
         print(f"Due date: {checkout.due_date}")
