@@ -11,7 +11,7 @@ BOOK_AUTHORS
 
 book_id PK, FK
 author_id PK, FK
---------------|
+--------------| association
 --------------|
 
 BOOKS
